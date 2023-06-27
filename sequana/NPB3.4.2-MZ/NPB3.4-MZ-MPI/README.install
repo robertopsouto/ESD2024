@@ -1,0 +1,184 @@
+NPB3.4-MZ (Multi-Zone) MPI+OpenMP Versions
+---------------------------------------------
+
+For details, see
+   http://www.nas.nasa.gov/Research/Reports/Techreports/2003/
+   nas-03-010-abstract.html
+
+NPB Development Team
+   npb@nas.nasa.gov
+
+
+Compilation
+------------
+
+1. copy one of the 'make.def' examples in config/NAS.samples or the
+   file config/make.def.template to config/make.def
+
+2. modify/specify the compiler and compilation flags in config/make.def
+
+3. use the following line to compile
+   make benchmark CLASS=class
+
+   [benchmark] is one of [bt-mz, sp-mz, lu-mz]
+   [class] is one of [S, W, A through F]
+
+   The "VERSION=VEC" option as provided in previous version (3.3)
+   is no longer supported.
+
+   Compilation for different number of MPI processes is no longer
+   required since NPB3.4.
+
+   The benchmarks have been designed so that they can be run
+   on a single processor without an MPI library. A few "dummy" 
+   MPI routines are still required for linking. For convenience
+   such a library is supplied in the "MPI_dummy" subdirectory of
+   the distribution. It contains an mpif.h and make.dummy include 
+   files which must be used as well. The dummy library is built and
+   linked automatically and paths to the include files are defined
+   by inserting the line "include ../config/make.dummy" into the
+   make.def file (see example in make.def.template). Make sure to 
+   read the warnings in the README file in "MPI_dummy". The use of
+   the library is fragile and can produce unexpected errors.
+
+
+Execution
+----------
+
+The executable is named <benchmark-name>.<class>.x and is 
+placed in the bin directory (or in the directory BINDIR specified 
+in the make.def).  The method for running the hybrid MPI+OpenMP 
+program depends on your local system.  Typically, you should first 
+specify the number of threads and define any needed runtime 
+parameters (see below for details), then use 'mpirun' (or similar 
+procedure available on your system) to run the program.
+
+Here is an example of running bt-mz, class A with 4 MPI processes
+and 2 OpenMP threads per process (in csh):
+
+   setenv OMP_NUM_THREADS 2
+   mpirun -np 4 bin/bt-mz.A.x
+
+
+Runtime Environment Variables and Setups
+-----------------------------------------
+
+1. Specify the number of threads
+
+There are two ways to specify the number of threads:
+   - using a load data file for different benchmark
+      loadbt-mz.data, loadsp-mz.data, or loadlu-mz.data
+   - using environment variables.
+
+1.1 load data file
+
+A load data file defines the number of threads used for each process
+and has the following format:
+   <proc#>  <number_of_threads>  <proc_group>
+   <proc#>  <number_of_threads>  <proc_group>
+   ...
+
+<proc#> starts from 0, up to <number_of_procs>-1.  <proc#> can be
+a range specified in one of the following two forms:
+   <p1-p2>  indicating processes from <p1> to <p2>
+   <p1:np>  indicating <np> number of processes starting from <p1>
+If <p1> is not specified, it defaults to 0 or the previous process#+1;
+if <p2> is not specified, it defaults to <number_of_procs>-1;
+if <np> is not specified, it defaults to the rest number of processes.
+
+The <proc_group> column can be used to specify a processor group 
+to which a process belongs.  This field is useful for running NPB-MZ 
+across several SMP boxes, where each individual SMP box could be 
+load-balanced with OpenMP threads up to the number of CPUs available 
+in the box.  The file will be read by the master process from the 
+current working directory.
+
+The load data file overrides the environment variables as described in
+Section 1.2, in particular, the load balancing with threads movement
+will not be applied if all values of <proc_group> are less than one.
+
+1.2 environment variables
+
+OMP_NUM_THREADS
+  - the number of threads per process.  If this variable is not specified,
+    one thread is assumed for each process.
+
+    The total number of threads is number_of_procs * num_threads if
+    the number of threads is the same for each process.
+
+NPB_NUM_XPROCS
+  - for LU-MZ only, controls the number of MPI processes assigned to
+    the I (or X) dimension paritition in the process grid.
+    The default is auto-setting.
+
+NPB_MZ_BLOAD
+  - flag for load balancing with threads.  By default, load balancing
+    with threads is on (with a value of "1", "ON" or "TRUE").
+    For SP-MZ and LU-MZ, the default scheme is block distribution.
+    To use the bin-packing scheme for these two benchmarks, select
+    a value of "2" or "-2". A negative value means no load balancing
+    with threads.
+  - A value of "ERANK" indicates that the number of threads may be
+    specified separately for each process via environment variables.
+    Load balancing with threads is not enabled for this case.
+    A value of "ERANK2" is a combination of "ERANK" + "2" as described.
+
+NPB_MAX_THREADS
+  - the maximum number of threads that can be used on each process for 
+    load balancing.  This value is checked only if NPB_MZ_BLOAD is enabled.
+    By default (with a value of 0), there is no limitation on the number
+    of threads.  If NPB_MAX_THREADS is specified, the value must be either
+    0 (for no limit) or no less than OMP_NUM_THREADS.
+
+2. Other environment variables
+
+NPB_VERBOSE
+  - flag to control verbose output.  By default (a value of 0), a summary
+    is printed.  With a value of 1 (or larger), more detailed information 
+    on zones is printed.
+
+NPB_TIMER_FLAG
+  - flag to enable additional timing statistics.
+
+3. Use the built-in profile timers
+
+An input parameter file may be used to change several parameters at 
+runtime, one of which is the timer flag that controls the collection of 
+some timing statistics.  In order to use this feature, one needs to create 
+an "input<benchmark>.data" file (<benchmark>=bt-mz, sp-mz or lu-mz) in 
+the working directory from the sample input files included in the source 
+directory.  To collect timing statistics, switch on the timer flag
+(with a value of 1 or larger) in the input file.
+
+An alternative way is to set the environment variable NPB_TIMER_FLAG
+to a proper timer flag. To collect timing statistics, set the value to 1.
+The old way of using file."timer.flag" to set the timer flag is still
+supported, but not recommended.
+
+
+Known Problems
+---------------
+  - Compilation of the codes requires a compiler that supports Fortran 90
+    and OpenMP 3.0, or higher.
+
+  - Running the LU-MZ benchmark in the hybrid mode (i.e., OMP_NUM_THREADS
+    is more than 1) requires the support of MPI_THREAD_MULTIPLE in the
+    underlying MPI library.  If MPI_THREAD_MULTIPLE is not supported,
+    a workaround is to set NPB_NUM_XPROCS=1.
+
+  - On SGI Origins using the Message Passing Toolkit (MPT) versions from 
+    1.4.0.3 to 1.7.0.0, the hybrid MPI+OpenMP version crashes due to the
+    use of the THREADPRIVATE directive in the codes.  As a workaround,
+    you can either use another MPT module (such as mpt.1.4.0.0) or set
+    the following environment variable:
+
+      setenv MPI_STATIC_NO_MAP (csh)
+      export MPI_STATIC_NO_MAP (sh)
+
+  - With some versions of Intel compilers, the following runtime variable
+    may be required to avoid a stacksize overflow:
+
+      setenv KMP_MONITOR_STACKSIZE 200k (csh)
+      export KMP_MONITOR_STACKSIZE=200k (sh)
+
+   
