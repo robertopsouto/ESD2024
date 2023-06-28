@@ -22,6 +22,7 @@ echo "Bechmark class problem: " $2
 ###################################
 #           COMPILER              #
 ###################################
+module load sequana/current
 module load openmpi/gnu/4.1.2+cuda-11.2_sequana
 
 DIR=$PWD
